@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Field, FieldGroup, FieldLabel, FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import { toast } from "sonner";
 import { IconAlertCircle, IconCircleCheck, IconEye, IconEyeOff } from "@tabler/icons-react";
 
 const LOCKOUT_STORAGE_KEY = "signup-lockout-until";
@@ -118,6 +119,7 @@ export function SignUpForm({ className, ...props }: React.ComponentProps<"div">)
         setError(error.message || "Failed to create account");
       }
     } else if (data) {
+      toast.success("Account created! Redirecting to login...");
       setSuccess(true);
       setTimeout(() => {
         window.location.href = "/login";
