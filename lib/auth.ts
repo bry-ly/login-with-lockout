@@ -4,7 +4,7 @@ import { prisma } from "./prisma";
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: "postgresql" }),
-  baseURL: "https://login-with-lockout.vercel.app/",
+  baseURL: "http://localhost:3000",
   emailAndPassword: { enabled: true },
   rateLimit: {
     enabled: true,
