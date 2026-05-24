@@ -10,10 +10,18 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import { LockoutDialog } from "@/components/lockout-dialog";
-import { IconAlertCircle, IconEye, IconEyeOff, IconLock, IconClock } from "@tabler/icons-react";
+import { IconAlertCircle, IconEye, IconEyeOff, IconLock, IconClock, IconAlertTriangle } from "@tabler/icons-react";
+import {
+  getLockoutDuration,
+  getLockoutLabel,
+  incrementStrike,
+  resetStrikes,
+  getStrikeCount,
+} from "@/lib/lockout";
 
 const LOCKOUT_STORAGE_KEY = "login-lockout-until";
-const LOCKOUT_DURATION = 60; // seconds, matches rate limit window
+const LOCKOUT_WINDOW_KEY = "login-lockout-window";
+const MAX_ATTEMPTS = 4; // server allows 5 requests before lockout (max:5 triggers on 6th); client shows attempts before lockout
 
 function getStoredLockoutEnd(): number | null {
   if (typeof window === "undefined") return null;
@@ -22,9 +30,18 @@ function getStoredLockoutEnd(): number | null {
   const end = parseInt(stored, 10);
   if (isNaN(end) || Date.now() >= end) {
     localStorage.removeItem(LOCKOUT_STORAGE_KEY);
+    localStorage.removeItem(LOCKOUT_WINDOW_KEY);
     return null;
   }
   return end;
+}
+
+function getStoredLockoutWindow(): number {
+  if (typeof window === "undefined") return 60;
+  const stored = localStorage.getItem(LOCKOUT_WINDOW_KEY);
+  if (!stored) return 60;
+  const parsed = parseInt(stored, 10);
+  return isNaN(parsed) ? 60 : parsed;
 }
 
 function formatTime(seconds: number) {
@@ -41,10 +58,12 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [validationErrors, setValidationErrors] = useState<{ email?: string; password?: string }>({});
+  const [remainingAttempts, setRemainingAttempts] = useState(MAX_ATTEMPTS);
 
   const [lockoutOpen, setLockoutOpen] = useState(false);
   const [retryAfter, setRetryAfter] = useState(0);
   const [lockoutRemaining, setLockoutRemaining] = useState(0);
+  const [lockoutStrikes, setLockoutStrikes] = useState(0);
   const wasLockedRef = useRef(false);
 
   // Restore lockout state from localStorage on mount
@@ -52,7 +71,8 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
     const end = getStoredLockoutEnd();
     if (end !== null) {
       const remaining = Math.ceil((end - Date.now()) / 1000);
-      setRetryAfter(remaining);
+      const totalWindow = getStoredLockoutWindow();
+      setRetryAfter(Math.max(remaining, totalWindow));
       setLockoutRemaining(remaining);
       setLockoutOpen(true);
     }
@@ -68,13 +88,20 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
     return () => clearInterval(interval);
   }, [lockoutRemaining]);
 
-  // Handle lockout expiry — closes dialog and clears storage
+  // Handle lockout expiry — closes dialog, clears storage, resets attempt counter
   useEffect(() => {
     if (lockoutRemaining > 0 || !wasLockedRef.current) return;
     wasLockedRef.current = false;
     setLockoutOpen(false);
+    setRemainingAttempts(MAX_ATTEMPTS);
     localStorage.removeItem(LOCKOUT_STORAGE_KEY);
+    localStorage.removeItem(LOCKOUT_WINDOW_KEY);
   }, [lockoutRemaining]);
+
+  // Sync strike count from localStorage on mount
+  useEffect(() => {
+    setLockoutStrikes(getStrikeCount("login"));
+  }, []);
 
   const handleLockoutChange = useCallback((open: boolean) => {
     setLockoutOpen(open);
@@ -82,11 +109,16 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
     // The form stays locked with the countdown until it naturally expires.
   }, []);
 
-  function handleRateLimit() {
-    const lockoutUntil = Date.now() + LOCKOUT_DURATION * 1000;
+  function handleRateLimit(_retryAfterSeconds: number) {
+    const strikes = incrementStrike("login");
+    setLockoutStrikes(strikes);
+    const duration = getLockoutDuration("login");
+    const lockoutUntil = Date.now() + duration * 1000;
     localStorage.setItem(LOCKOUT_STORAGE_KEY, String(lockoutUntil));
-    setRetryAfter(LOCKOUT_DURATION);
-    setLockoutRemaining(LOCKOUT_DURATION);
+    localStorage.setItem(LOCKOUT_WINDOW_KEY, String(duration));
+    setRetryAfter(duration);
+    setLockoutRemaining(duration);
+    setRemainingAttempts(0);
     setLockoutOpen(true);
   }
 
@@ -106,11 +138,15 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
 
     if (error) {
       if (error.status === 429) {
-        handleRateLimit();
+        handleRateLimit(0); // duration is calculated from strikes
       } else {
         setError(error.message || "Invalid email or password");
+        setRemainingAttempts((prev) => Math.max(0, prev - 1));
       }
     } else if (data) {
+      setRemainingAttempts(MAX_ATTEMPTS);
+      setLockoutStrikes(0);
+      resetStrikes("login");
       toast.success("Logged in successfully!");
       window.location.href = "/dashboard";
     }
@@ -160,6 +196,11 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
                     <IconLock className="size-4 mt-0.5 shrink-0" />
                     <div className="flex flex-col gap-0.5">
                       <span className="font-medium">Account Temporarily Locked</span>
+                      {lockoutStrikes > 0 && (
+                        <span className="text-[10px] font-medium text-destructive/70 uppercase tracking-wider">
+                          {getLockoutLabel(lockoutStrikes)}
+                        </span>
+                      )}
                       <div className="flex items-center gap-1.5">
                         <IconClock className="size-3.5" />
                         <span>Try again in {formatTime(lockoutRemaining)}</span>
@@ -205,6 +246,23 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
                   </div>
                 )}
 
+                {!isLocked && remainingAttempts < MAX_ATTEMPTS && remainingAttempts > 0 && (
+                  <div className="flex items-center gap-2 rounded-sm bg-amber-50 dark:bg-amber-950/20 p-2.5 text-xs text-amber-700 dark:text-amber-400">
+                    <IconAlertTriangle className="size-3.5 shrink-0" />
+                    <span className="flex-1">{remainingAttempts} of {MAX_ATTEMPTS} attempts remaining</span>
+                    <div className="flex gap-1">
+                      {Array.from({ length: MAX_ATTEMPTS }, (_, i) => (
+                        <div
+                          key={i}
+                          className={`size-2 rounded-full transition-colors duration-300 ${
+                            i < remainingAttempts ? 'bg-amber-400 dark:bg-amber-500' : 'bg-amber-200 dark:bg-amber-800'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <Field>
                   <Button type="submit" className="w-full" disabled={isLoading || isLocked}>
                     {isLoading ? (
@@ -234,7 +292,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
         </Card>
       </div>
 
-      <LockoutDialog open={lockoutOpen} onOpenChange={handleLockoutChange} retryAfter={lockoutRemaining} />
+      <LockoutDialog open={lockoutOpen} onOpenChange={handleLockoutChange} retryAfter={lockoutRemaining} totalWindow={retryAfter} lockoutStrikes={lockoutStrikes} />
     </>
   );
 }
