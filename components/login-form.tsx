@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Field, FieldGroup, FieldLabel, FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import { toast } from "sonner";
 import { LockoutDialog } from "@/components/lockout-dialog";
 import { IconAlertCircle, IconEye, IconEyeOff, IconLock, IconClock } from "@tabler/icons-react";
 
@@ -110,6 +111,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
         setError(error.message || "Invalid email or password");
       }
     } else if (data) {
+      toast.success("Logged in successfully!");
       window.location.href = "/dashboard";
     }
 
