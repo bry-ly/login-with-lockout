@@ -13,6 +13,8 @@ interface LockoutDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   retryAfter: number
+  totalWindow?: number
+  lockoutStrikes?: number
 }
 
 function formatTime(seconds: number) {
@@ -28,6 +30,8 @@ export function LockoutDialog({
   open,
   onOpenChange,
   retryAfter,
+  totalWindow,
+  lockoutStrikes = 0,
 }: LockoutDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -37,10 +41,20 @@ export function LockoutDialog({
             <div className="flex size-10 items-center justify-center rounded-full bg-destructive/10">
               <IconLock className="size-5 text-destructive" />
             </div>
-            <DialogTitle>Account Temporarily Locked</DialogTitle>
+            <div className="space-y-0.5">
+              <DialogTitle>Account Temporarily Locked</DialogTitle>
+              {lockoutStrikes > 0 && (
+                <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                  {lockoutStrikes === 1 ? "1st" : lockoutStrikes === 2 ? "2nd" : lockoutStrikes === 3 ? "3rd" : `${lockoutStrikes}th`} lockout
+                </div>
+              )}
+            </div>
           </div>
           <DialogDescription>
-            Too many failed login attempts. Please wait before trying again.
+            Too many failed login attempts.{" "}
+            {lockoutStrikes >= 3
+              ? "Your account has been locked for an extended period due to repeated violations."
+              : "Please wait before trying again."}
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col items-center gap-3 py-4">
@@ -55,7 +69,7 @@ export function LockoutDialog({
             <div
               className="h-full rounded-full bg-destructive transition-all duration-1000 ease-linear"
               style={{
-                width: `${(retryAfter / 60) * 100}%`,
+                width: `${totalWindow ? (retryAfter / totalWindow) * 100 : (retryAfter / 60) * 100}%`,
               }}
             />
           </div>
