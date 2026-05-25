@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { authClient } from "@/lib/auth-client";
+import { signIn } from "@/app/login/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldGroup, FieldLabel, FieldError } from "@/components/ui/field";
@@ -12,17 +12,11 @@ import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import { LockoutDialog } from "@/components/lockout-dialog";
 import { IconAlertCircle, IconEye, IconEyeOff, IconLock, IconClock, IconAlertTriangle } from "@tabler/icons-react";
-import {
-  getLockoutDuration,
-  getLockoutLabel,
-  incrementStrike,
-  resetStrikes,
-  getStrikeCount,
-} from "@/lib/lockout";
+import { getLockoutDuration, getLockoutLabel, incrementStrike, resetStrikes, getStrikeCount } from "@/lib/lockout";
 
 const LOCKOUT_STORAGE_KEY = "login-lockout-until";
 const LOCKOUT_WINDOW_KEY = "login-lockout-window";
-const MAX_ATTEMPTS = 4; // server allows 5 requests before lockout (max:5 triggers on 6th); client shows attempts before lockout
+const MAX_ATTEMPTS = 4; // server max:4 → 429 on 5th request; client counts down from 4
 
 function getStoredLockoutEnd(): number | null {
   if (typeof window === "undefined") return null;
@@ -125,21 +119,24 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
 
     setIsLoading(true);
 
-    const { data, error } = await authClient.signIn.email({
-      email,
-      password,
-    });
+    const result = await signIn(email, password);
 
-    if (error) {
-      if (error.status === 429) {
-        handleRateLimit(); // duration is calculated from strikes
+    if (!result.success) {
+      if (result.rateLimited) {
+        handleRateLimit();
       } else {
-        setError(error.message || "Invalid email or password");
-        setRemainingAttempts((prev) => Math.max(0, prev - 1));
+        setError(result.error);
+        const next = remainingAttempts - 1;
+        if (next <= 0) {
+          handleRateLimit();
+        } else {
+          setRemainingAttempts(next);
+        }
       }
-    } else if (data) {
+    } else {
       setRemainingAttempts(MAX_ATTEMPTS);
       setLockoutStrikes(0);
+      localStorage.setItem("last-login-strike-count", String(lockoutStrikes));
       resetStrikes("login");
       toast.success("Logged in successfully!");
       router.push("/dashboard");
@@ -148,7 +145,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
     setIsLoading(false);
   }
 
-    function handleFieldChange(field: "email" | "password", value: string) {
+  function handleFieldChange(field: "email" | "password", value: string) {
     if (field === "email") {
       setEmail(value);
     } else {
@@ -181,31 +178,41 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
           <CardHeader>
             <CardTitle>Login to your account</CardTitle>
             <CardDescription>Enter your email and password to login to your account</CardDescription>
+            {!isLocked && remainingAttempts < MAX_ATTEMPTS && remainingAttempts > 0 && (
+              <div className="mt-4 flex items-center gap-2 rounded-sm bg-amber-50 dark:bg-amber-950/20 p-2.5 text-xs text-amber-700 dark:text-amber-400">
+                <IconAlertTriangle className="size-3.5 shrink-0" />
+                <span>
+                  {remainingAttempts} of {MAX_ATTEMPTS} attempts remaining
+                </span>
+              </div>
+            )}
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit}>
               <FieldGroup>
                 {isLocked && (
-                  <div className="flex items-start gap-3 rounded-sm bg-destructive/10 p-3 text-xs text-destructive">
-                    <IconLock className="size-4 mt-0.5 shrink-0" />
-                    <div className="flex flex-col gap-0.5">
-                      <span className="font-medium">Account Temporarily Locked</span>
-                      {lockoutStrikes > 0 && (
-                        <span className="text-[10px] font-medium text-destructive/70 uppercase tracking-wider">
-                          {getLockoutLabel(lockoutStrikes)}
-                        </span>
-                      )}
-                      <div className="flex items-center gap-1.5">
-                        <IconClock className="size-3.5" />
-                        <span>Try again in {formatTime(lockoutRemaining)}</span>
-                      </div>
+                  <div className="rounded-sm bg-destructive/10 p-3 text-xs text-destructive">
+                    <div className="flex items-center justify-center gap-2">
+                      <IconClock className="size-3.5 shrink-0" />
+                      <span>
+                        Locked. Try again in <span className="font-medium tabular-nums">{formatTime(lockoutRemaining)}</span>
+                      </span>
                     </div>
+                    {lockoutStrikes > 0 && <p className="mt-1 text-center text-[10px] font-semibold uppercase tracking-widest text-destructive/60">{getLockoutLabel(lockoutStrikes)}</p>}
                   </div>
                 )}
 
                 <Field>
                   <FieldLabel htmlFor="email">Email</FieldLabel>
-                  <Input id="email" type="email" placeholder="m@example.com" value={email} onChange={(e) => handleFieldChange("email", e.target.value)} aria-invalid={!!validationErrors.email || !!error ? true : undefined} disabled={isLoading || isLocked} />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="your@gmail.com"
+                    value={email}
+                    onChange={(e) => handleFieldChange("email", e.target.value)}
+                    aria-invalid={!!validationErrors.email || !!error ? true : undefined}
+                    disabled={isLoading || isLocked}
+                  />
                   {validationErrors.email && <FieldError>{validationErrors.email}</FieldError>}
                 </Field>
                 <Field>
@@ -237,23 +244,6 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
                   <div className="flex items-center gap-2 rounded-sm bg-destructive/10 p-3 text-xs text-destructive">
                     <IconAlertCircle className="size-4 shrink-0" />
                     <span>{error}</span>
-                  </div>
-                )}
-
-                {!isLocked && remainingAttempts < MAX_ATTEMPTS && remainingAttempts > 0 && (
-                  <div className="flex items-center gap-2 rounded-sm bg-amber-50 dark:bg-amber-950/20 p-2.5 text-xs text-amber-700 dark:text-amber-400">
-                    <IconAlertTriangle className="size-3.5 shrink-0" />
-                    <span className="flex-1">{remainingAttempts} of {MAX_ATTEMPTS} attempts remaining</span>
-                    <div className="flex gap-1">
-                      {Array.from({ length: MAX_ATTEMPTS }, (_, i) => (
-                        <div
-                          key={i}
-                          className={`size-2 rounded-full transition-colors duration-300 ${
-                            i < remainingAttempts ? 'bg-amber-400 dark:bg-amber-500' : 'bg-amber-200 dark:bg-amber-800'
-                          }`}
-                        />
-                      ))}
-                    </div>
                   </div>
                 )}
 

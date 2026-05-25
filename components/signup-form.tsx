@@ -253,7 +253,7 @@ export function SignUpForm({ className, ...props }: React.ComponentProps<"div">)
                   <Input
                     id="name"
                     type="text"
-                    placeholder="John Doe"
+                    placeholder="your username"
                     value={name}
                     onChange={(e) => handleFieldChange("name", e.target.value)}
                     aria-invalid={!!validationErrors.name ? true : undefined}
