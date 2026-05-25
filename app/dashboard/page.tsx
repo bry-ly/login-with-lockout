@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
-import { IconLogout, IconUser, IconMail, IconCalendar, IconShield, IconLock } from "@tabler/icons-react";
+import { IconLogout, IconUser, IconMail, IconCalendar } from "@tabler/icons-react";
 import { getLockoutLabel } from "@/lib/lockout";
 
 export default function DashboardPage() {
@@ -50,7 +50,7 @@ export default function DashboardPage() {
   }
 
   const user = session.user;
-  const createdAt = new Date(user.createdAt ?? Date.now());
+  const createdAt = new Date(user.createdAt);
 
   return (
     <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
