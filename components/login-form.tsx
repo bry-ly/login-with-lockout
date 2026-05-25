@@ -75,7 +75,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
       return;
     }
     incrementStrike("login");
-    setLockoutStrikes(strikes);
+    setLockoutStrikes(Math.ceil(strikes / MAX_ATTEMPTS));
     const lockoutUntil = Date.now() + retryAfter * 1000;
     localStorage.setItem(lockoutKey(email, "until"), String(lockoutUntil));
     localStorage.setItem(lockoutKey(email, "window"), String(retryAfter));
