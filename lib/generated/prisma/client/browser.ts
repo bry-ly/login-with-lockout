@@ -42,3 +42,8 @@ export type Verification = Prisma.VerificationModel
  * 
  */
 export type rateLimit = Prisma.rateLimitModel
+/**
+ * Model loginLockout
+ * 
+ */
+export type loginLockout = Prisma.loginLockoutModel

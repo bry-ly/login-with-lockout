@@ -388,7 +388,8 @@ export const ModelName = {
   Session: 'Session',
   Account: 'Account',
   Verification: 'Verification',
-  rateLimit: 'rateLimit'
+  rateLimit: 'rateLimit',
+  loginLockout: 'loginLockout'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -404,7 +405,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "session" | "account" | "verification" | "rateLimit"
+    modelProps: "user" | "session" | "account" | "verification" | "rateLimit" | "loginLockout"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -778,6 +779,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    loginLockout: {
+      payload: Prisma.$loginLockoutPayload<ExtArgs>
+      fields: Prisma.loginLockoutFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.loginLockoutFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$loginLockoutPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.loginLockoutFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$loginLockoutPayload>
+        }
+        findFirst: {
+          args: Prisma.loginLockoutFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$loginLockoutPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.loginLockoutFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$loginLockoutPayload>
+        }
+        findMany: {
+          args: Prisma.loginLockoutFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$loginLockoutPayload>[]
+        }
+        create: {
+          args: Prisma.loginLockoutCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$loginLockoutPayload>
+        }
+        createMany: {
+          args: Prisma.loginLockoutCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.loginLockoutCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$loginLockoutPayload>[]
+        }
+        delete: {
+          args: Prisma.loginLockoutDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$loginLockoutPayload>
+        }
+        update: {
+          args: Prisma.loginLockoutUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$loginLockoutPayload>
+        }
+        deleteMany: {
+          args: Prisma.loginLockoutDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.loginLockoutUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.loginLockoutUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$loginLockoutPayload>[]
+        }
+        upsert: {
+          args: Prisma.loginLockoutUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$loginLockoutPayload>
+        }
+        aggregate: {
+          args: Prisma.LoginLockoutAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateLoginLockout>
+        }
+        groupBy: {
+          args: Prisma.loginLockoutGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.LoginLockoutGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.loginLockoutCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.LoginLockoutCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -823,6 +898,10 @@ export const UserScalarFieldEnum = {
   email: 'email',
   emailVerified: 'emailVerified',
   image: 'image',
+  role: 'role',
+  banned: 'banned',
+  banReason: 'banReason',
+  banExpires: 'banExpires',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -838,7 +917,8 @@ export const SessionScalarFieldEnum = {
   updatedAt: 'updatedAt',
   ipAddress: 'ipAddress',
   userAgent: 'userAgent',
-  userId: 'userId'
+  userId: 'userId',
+  impersonatedBy: 'impersonatedBy'
 } as const
 
 export type SessionScalarFieldEnum = (typeof SessionScalarFieldEnum)[keyof typeof SessionScalarFieldEnum]
@@ -883,6 +963,18 @@ export const RateLimitScalarFieldEnum = {
 } as const
 
 export type RateLimitScalarFieldEnum = (typeof RateLimitScalarFieldEnum)[keyof typeof RateLimitScalarFieldEnum]
+
+
+export const LoginLockoutScalarFieldEnum = {
+  id: 'id',
+  email: 'email',
+  strikes: 'strikes',
+  lockedUntil: 'lockedUntil',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type LoginLockoutScalarFieldEnum = (typeof LoginLockoutScalarFieldEnum)[keyof typeof LoginLockoutScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -1106,6 +1198,7 @@ export type GlobalOmitConfig = {
   account?: Prisma.AccountOmit
   verification?: Prisma.VerificationOmit
   rateLimit?: Prisma.rateLimitOmit
+  loginLockout?: Prisma.loginLockoutOmit
 }
 
 /* Types for Logging */
