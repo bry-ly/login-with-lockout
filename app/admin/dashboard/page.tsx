@@ -3,9 +3,22 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
-import { getDashboardData, unlockUser, type DashboardData } from "./actions";
+import { toast } from "sonner";
+import { getDashboardData, unlockUser, deleteUser, type DashboardData } from "./actions";
 import { MAX_ATTEMPTS } from "@/lib/rate-limit-config";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
@@ -26,6 +39,7 @@ import {
   IconUsers,
   IconAlertTriangle,
   IconX,
+  IconTrash,
 } from "@tabler/icons-react";
 
 type Tab = "users" | "analytics";
@@ -37,6 +51,7 @@ export default function AdminDashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [deleteEmail, setDeleteEmail] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,6 +74,14 @@ export default function AdminDashboardPage() {
 
   const handleUnlock = async (email: string) => {
     setData(await unlockUser(email));
+    toast.success("User unlocked");
+  };
+
+  const handleDelete = async () => {
+    if (!deleteEmail) return;
+    setData(await deleteUser(deleteEmail));
+    setDeleteEmail(null);
+    toast.success("User deleted");
   };
 
   const filteredUsers = (data?.users ?? []).filter(
@@ -189,12 +212,32 @@ export default function AdminDashboardPage() {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      {user.lockedUntil && (
-                        <Button variant="ghost" size="sm" onClick={() => handleUnlock(user.email)} className="text-xs">
-                          <IconX className="size-3.5" />
-                          Unlock
-                        </Button>
-                      )}
+                      <div className="flex items-center justify-end gap-1">
+                        {user.lockedUntil && (
+                          <Button variant="ghost" size="sm" onClick={() => handleUnlock(user.email)} className="text-xs">
+                            <IconX className="size-3.5" />
+                            Unlock
+                          </Button>
+                        )}
+                        <AlertDialog open={deleteEmail === user.email} onOpenChange={(open) => setDeleteEmail(open ? user.email : null)}>
+                          <AlertDialogTrigger render={<Button variant="ghost" size="sm" className="text-xs text-destructive hover:text-destructive"><IconTrash className="size-3.5" />Delete</Button>} />
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogMedia>
+                                <IconTrash className="size-5 text-destructive" />
+                              </AlertDialogMedia>
+                              <AlertDialogTitle>Delete User</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will permanently delete the user <strong>{user.email}</strong> and all their data. This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction variant="destructive" onClick={handleDelete}>Delete</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
