@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
@@ -51,6 +52,7 @@ function formatTime(seconds: number) {
 }
 
 export function SignUpForm({ className, ...props }: React.ComponentProps<"div">) {
+  const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -67,23 +69,20 @@ export function SignUpForm({ className, ...props }: React.ComponentProps<"div">)
     confirmPassword?: string;
   }>({});
 
-  const [lockoutOpen, setLockoutOpen] = useState(false);
-  const [retryAfter, setRetryAfter] = useState(0);
-  const [lockoutRemaining, setLockoutRemaining] = useState(0);
-  const [lockoutStrikes, setLockoutStrikes] = useState(0);
-  const wasLockedRef = useRef(false);
-
-  // Restore lockout state from localStorage on mount
-  useEffect(() => {
+  const [lockoutOpen, setLockoutOpen] = useState(() => getStoredLockoutEnd() !== null);
+  const [retryAfter, setRetryAfter] = useState(() => {
     const end = getStoredLockoutEnd();
-    if (end !== null) {
-      const remaining = Math.ceil((end - Date.now()) / 1000);
-      const totalWindow = getStoredLockoutWindow();
-      setRetryAfter(Math.max(remaining, totalWindow));
-      setLockoutRemaining(remaining);
-      setLockoutOpen(true);
-    }
-  }, []);
+    if (end === null) return 0;
+    const remaining = Math.ceil((end - Date.now()) / 1000);
+    const totalWindow = getStoredLockoutWindow();
+    return Math.max(remaining, totalWindow);
+  });
+  const [lockoutRemaining, setLockoutRemaining] = useState(() => {
+    const end = getStoredLockoutEnd();
+    return end !== null ? Math.ceil((end - Date.now()) / 1000) : 0;
+  });
+  const [lockoutStrikes, setLockoutStrikes] = useState(() => getStrikeCount("signup"));
+  const wasLockedRef = useRef(false);
 
   // Countdown timer for the form lockout display
   useEffect(() => {
@@ -94,11 +93,6 @@ export function SignUpForm({ className, ...props }: React.ComponentProps<"div">)
     }, 1000);
     return () => clearInterval(interval);
   }, [lockoutRemaining]);
-
-  // Sync strike count from localStorage on mount
-  useEffect(() => {
-    setLockoutStrikes(getStrikeCount("signup"));
-  }, []);
 
   // Handle lockout expiry — closes dialog and clears storage
   useEffect(() => {
@@ -156,7 +150,7 @@ export function SignUpForm({ className, ...props }: React.ComponentProps<"div">)
     return Object.keys(errors).length === 0;
   }
 
-  function handleRateLimit(_retryAfterSeconds: number) {
+  function handleRateLimit() {
     const strikes = incrementStrike("signup");
     setLockoutStrikes(strikes);
     const duration = getLockoutDuration("signup");
@@ -168,7 +162,7 @@ export function SignUpForm({ className, ...props }: React.ComponentProps<"div">)
     setLockoutOpen(true);
   }
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
@@ -188,7 +182,7 @@ export function SignUpForm({ className, ...props }: React.ComponentProps<"div">)
 
     if (error) {
       if (error.status === 429) {
-        handleRateLimit(0); // duration is calculated from strikes
+        handleRateLimit(); // duration is calculated from strikes
       } else {
         setError(error.message || "Failed to create account");
       }
@@ -198,7 +192,7 @@ export function SignUpForm({ className, ...props }: React.ComponentProps<"div">)
       toast.success("Account created! Redirecting to login...");
       setSuccess(true);
       setTimeout(() => {
-        window.location.href = "/login";
+        router.push("/login");
       }, 1500);
     }
 

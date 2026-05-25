@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
@@ -52,6 +53,7 @@ function formatTime(seconds: number) {
 }
 
 export function LoginForm({ className, ...props }: React.ComponentProps<"div">) {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -60,23 +62,20 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
   const [validationErrors, setValidationErrors] = useState<{ email?: string; password?: string }>({});
   const [remainingAttempts, setRemainingAttempts] = useState(MAX_ATTEMPTS);
 
-  const [lockoutOpen, setLockoutOpen] = useState(false);
-  const [retryAfter, setRetryAfter] = useState(0);
-  const [lockoutRemaining, setLockoutRemaining] = useState(0);
-  const [lockoutStrikes, setLockoutStrikes] = useState(0);
-  const wasLockedRef = useRef(false);
-
-  // Restore lockout state from localStorage on mount
-  useEffect(() => {
+  const [lockoutOpen, setLockoutOpen] = useState(() => getStoredLockoutEnd() !== null);
+  const [retryAfter, setRetryAfter] = useState(() => {
     const end = getStoredLockoutEnd();
-    if (end !== null) {
-      const remaining = Math.ceil((end - Date.now()) / 1000);
-      const totalWindow = getStoredLockoutWindow();
-      setRetryAfter(Math.max(remaining, totalWindow));
-      setLockoutRemaining(remaining);
-      setLockoutOpen(true);
-    }
-  }, []);
+    if (end === null) return 0;
+    const remaining = Math.ceil((end - Date.now()) / 1000);
+    const totalWindow = getStoredLockoutWindow();
+    return Math.max(remaining, totalWindow);
+  });
+  const [lockoutRemaining, setLockoutRemaining] = useState(() => {
+    const end = getStoredLockoutEnd();
+    return end !== null ? Math.ceil((end - Date.now()) / 1000) : 0;
+  });
+  const [lockoutStrikes, setLockoutStrikes] = useState(() => getStrikeCount("login"));
+  const wasLockedRef = useRef(false);
 
   // Countdown timer for the form lockout display
   useEffect(() => {
@@ -98,18 +97,13 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
     localStorage.removeItem(LOCKOUT_WINDOW_KEY);
   }, [lockoutRemaining]);
 
-  // Sync strike count from localStorage on mount
-  useEffect(() => {
-    setLockoutStrikes(getStrikeCount("login"));
-  }, []);
-
   const handleLockoutChange = useCallback((open: boolean) => {
     setLockoutOpen(open);
     // Don't clear lockout state when dialog is dismissed.
     // The form stays locked with the countdown until it naturally expires.
   }, []);
 
-  function handleRateLimit(_retryAfterSeconds: number) {
+  function handleRateLimit() {
     const strikes = incrementStrike("login");
     setLockoutStrikes(strikes);
     const duration = getLockoutDuration("login");
@@ -122,7 +116,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
     setLockoutOpen(true);
   }
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     setValidationErrors({});
@@ -138,7 +132,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
 
     if (error) {
       if (error.status === 429) {
-        handleRateLimit(0); // duration is calculated from strikes
+        handleRateLimit(); // duration is calculated from strikes
       } else {
         setError(error.message || "Invalid email or password");
         setRemainingAttempts((prev) => Math.max(0, prev - 1));
@@ -148,7 +142,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
       setLockoutStrikes(0);
       resetStrikes("login");
       toast.success("Logged in successfully!");
-      window.location.href = "/dashboard";
+      router.push("/dashboard");
     }
 
     setIsLoading(false);
