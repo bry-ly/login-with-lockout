@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { useSignout } from "@/hooks/use-signout";
 
@@ -8,11 +9,19 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
-import { IconLogout, IconUser, IconMail, IconCalendar, IconShield } from "@tabler/icons-react";
+import { IconLogout, IconUser, IconMail, IconCalendar, IconShield, IconLock } from "@tabler/icons-react";
+import { getLockoutLabel } from "@/lib/lockout";
 
 export default function DashboardPage() {
   const { data: session, isPending } = useSession();
   const signout = useSignout();
+  const [lastStrikes] = useState(() => {
+    if (typeof window === "undefined") return 0;
+    const stored = localStorage.getItem("last-login-strike-count");
+    if (!stored) return 0;
+    const parsed = parseInt(stored, 10);
+    return isNaN(parsed) ? 0 : parsed;
+  });
 
   if (isPending) {
     return (
@@ -44,30 +53,14 @@ export default function DashboardPage() {
   const createdAt = new Date(user.createdAt ?? Date.now());
 
   return (
-    <div className="flex min-h-svh w-full flex-col">
-      {/* Header */}
-      <header className="flex items-center justify-between border-b border-border px-6 py-3">
-        <div className="flex items-center gap-2">
-          <IconShield className="size-5 text-primary" />
-          <span className="text-sm font-medium">Dashboard</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-muted-foreground">{user.email}</span>
-          <Button variant="outline" size="xs" onClick={signout}>
-            <IconLogout className="size-3.5" />
-            Sign out
-          </Button>
-        </div>
-      </header>
-
-      {/* Main content */}
-      <main className="flex flex-1 flex-col gap-6 p-6 md:p-10">
+    <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
+      <div className="flex w-full max-w-lg flex-col gap-6">
         <div>
           <h1 className="text-lg font-medium">Welcome, {user.name}</h1>
           <p className="text-xs text-muted-foreground">Here&apos;s an overview of your account.</p>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4">
           {/* Profile card */}
           <Card>
             <CardHeader>
@@ -124,27 +117,34 @@ export default function DashboardPage() {
                   <span className="text-muted-foreground">Session active</span>
                   <span className="font-medium text-green-600">Yes</span>
                 </div>
+                <Separator />
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Lockouts</span>
+                  <span className={`font-medium ${lastStrikes > 0 ? "text-destructive" : "text-green-600"}`}>
+                    {lastStrikes > 0 ? getLockoutLabel(lastStrikes) : "None"}
+                  </span>
+                </div>
               </div>
             </CardContent>
           </Card>
-        </div>
 
-        {/* Sign out section */}
-        <Card className="max-w-md">
-          <CardHeader>
-            <CardTitle>Sign out</CardTitle>
-            <CardDescription>
-              End your current session and return to the login page.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button variant="destructive" onClick={signout}>
-              <IconLogout className="size-4" />
-              Sign out
-            </Button>
-          </CardContent>
-        </Card>
-      </main>
+          {/* Sign out section */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Sign out</CardTitle>
+              <CardDescription>
+                End your current session and return to the login page.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex justify-end">
+              <Button variant="destructive" onClick={signout}>
+                <IconLogout className="size-4" />
+                Sign out
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }
