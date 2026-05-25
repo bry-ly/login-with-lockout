@@ -1,10 +1,11 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "./prisma";
+import { nextCookies } from "better-auth/next-js";
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: "postgresql" }),
-  baseURL: "https://login-with-lockout.vercel.app/",
+  baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
   emailAndPassword: { enabled: true },
   rateLimit: {
     enabled: true,
@@ -13,9 +14,10 @@ export const auth = betterAuth({
     customRules: {
       "/sign-in/email": {
         window: 60,
-        max: 5,
+        max: 4,
       },
     },
     storage: "database",
   },
+  plugins: [nextCookies()],
 });
