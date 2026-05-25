@@ -6,16 +6,17 @@ import { checkLockout, recordFailedAttempt, resetLockout } from "@/lib/lockout-s
 
 export type SignInResult =
   | { success: true }
-  | { success: false; error: string; retryAfter?: number; lockoutStrikes?: number };
+  | { success: false; error: string; retryAfter?: number; lockoutStrikes?: number; banned?: boolean };
 
 export async function signIn(email: string, password: string): Promise<SignInResult> {
   const lockout = await checkLockout(email);
   if (lockout.locked) {
     return {
       success: false,
-      error: "Account temporarily locked",
+      error: lockout.banned ? "Account permanently banned" : "Account temporarily locked",
       retryAfter: lockout.retryAfter,
       lockoutStrikes: lockout.strikes,
+      banned: lockout.banned,
     };
   }
 

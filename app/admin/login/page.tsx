@@ -50,14 +50,7 @@ export default function AdminLoginPage() {
               <FieldGroup>
                 <Field>
                   <FieldLabel htmlFor="email">Email</FieldLabel>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="admin@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    disabled={isLoading}
-                  />
+                  <Input id="email" type="email" placeholder="admin@example.com" value={email} onChange={(e) => setEmail(e.target.value)} disabled={isLoading} />
                 </Field>
                 <Field>
                   <div className="relative">

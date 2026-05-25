@@ -72,5 +72,6 @@ export async function unlockUser(email: string): Promise<DashboardData> {
   if (!session) return { users: [], stats: { currentlyLocked: 0, topUsers: [], totalStrikes: 0 } };
 
   await prisma.loginLockout.delete({ where: { email } }).catch(() => {});
+  await prisma.user.update({ where: { email }, data: { banned: false, banReason: null } }).catch(() => {});
   return getDashboardData();
 }

@@ -7,7 +7,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog"
-import { IconLock, IconClock } from "@tabler/icons-react"
+import { IconLock, IconClock, IconBan } from "@tabler/icons-react"
 
 interface LockoutDialogProps {
   open: boolean
@@ -15,6 +15,7 @@ interface LockoutDialogProps {
   retryAfter: number
   totalWindow?: number
   lockoutStrikes?: number
+  banned?: boolean
 }
 
 function formatTime(seconds: number) {
@@ -32,7 +33,31 @@ export function LockoutDialog({
   retryAfter,
   totalWindow,
   lockoutStrikes = 0,
+  banned = false,
 }: LockoutDialogProps) {
+  if (banned) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="flex size-10 items-center justify-center rounded-full bg-destructive/10">
+                <IconBan className="size-5 text-destructive" />
+              </div>
+              <div className="space-y-0.5">
+                <DialogTitle>Account Permanently Banned</DialogTitle>
+              </div>
+            </div>
+            <DialogDescription>
+              Your account has been permanently banned due to excessive failed login attempts.
+              Please contact an administrator to restore access.
+            </DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
+    )
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-sm">
