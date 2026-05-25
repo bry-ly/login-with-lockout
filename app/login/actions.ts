@@ -2,12 +2,23 @@
 
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+import { checkLockout, recordFailedAttempt, resetLockout } from "@/lib/lockout-server";
 
 export type SignInResult =
   | { success: true }
-  | { success: false; rateLimited: boolean; error: string };
+  | { success: false; error: string; retryAfter?: number; lockoutStrikes?: number };
 
 export async function signIn(email: string, password: string): Promise<SignInResult> {
+  const lockout = await checkLockout(email);
+  if (lockout.locked) {
+    return {
+      success: false,
+      error: "Account temporarily locked",
+      retryAfter: lockout.retryAfter,
+      lockoutStrikes: lockout.strikes,
+    };
+  }
+
   try {
     const result = await auth.api.signInEmail({
       body: { email, password },
@@ -15,16 +26,24 @@ export async function signIn(email: string, password: string): Promise<SignInRes
     });
 
     if (!result) {
-      return { success: false, rateLimited: false, error: "Invalid email or password" };
+      const next = await recordFailedAttempt(email);
+      return {
+        success: false,
+        error: "Invalid email or password",
+        retryAfter: next.locked ? next.retryAfter : undefined,
+        lockoutStrikes: next.strikes,
+      };
     }
 
+    await resetLockout(email);
     return { success: true };
-  } catch (e: unknown) {
-    const status = (e as { status?: number })?.status;
-    if (status === 429) {
-      return { success: false, rateLimited: true, error: "Too many attempts" };
-    }
-    const message = (e as { message?: string })?.message;
-    return { success: false, rateLimited: false, error: message || "Invalid email or password" };
+  } catch {
+    const next = await recordFailedAttempt(email);
+    return {
+      success: false,
+      error: "Too many attempts",
+      retryAfter: next.locked ? next.retryAfter : undefined,
+      lockoutStrikes: next.strikes,
+    };
   }
 }

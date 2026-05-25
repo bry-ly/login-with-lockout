@@ -12,11 +12,11 @@ import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import { LockoutDialog } from "@/components/lockout-dialog";
 import { IconAlertCircle, IconEye, IconEyeOff, IconLock, IconClock, IconAlertTriangle } from "@tabler/icons-react";
-import { getLockoutDuration, getLockoutLabel, incrementStrike, resetStrikes, getStrikeCount } from "@/lib/lockout";
+import { getLockoutLabel, incrementStrike, resetStrikes, getStrikeCount } from "@/lib/lockout";
+import { MAX_ATTEMPTS } from "@/lib/rate-limit-config";
 
 const LOCKOUT_STORAGE_KEY = "login-lockout-until";
 const LOCKOUT_WINDOW_KEY = "login-lockout-window";
-const MAX_ATTEMPTS = 4; // server max:4 → 429 on 5th request; client counts down from 4
 
 function getStoredLockoutEnd(): number | null {
   if (typeof window === "undefined") return null;
@@ -97,15 +97,14 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
     // The form stays locked with the countdown until it naturally expires.
   }, []);
 
-  function handleRateLimit() {
-    const strikes = incrementStrike("login");
+  function handleServerLockout(retryAfter: number, strikes: number) {
+    incrementStrike("login");
     setLockoutStrikes(strikes);
-    const duration = getLockoutDuration("login");
-    const lockoutUntil = Date.now() + duration * 1000;
+    const lockoutUntil = Date.now() + retryAfter * 1000;
     localStorage.setItem(LOCKOUT_STORAGE_KEY, String(lockoutUntil));
-    localStorage.setItem(LOCKOUT_WINDOW_KEY, String(duration));
-    setRetryAfter(duration);
-    setLockoutRemaining(duration);
+    localStorage.setItem(LOCKOUT_WINDOW_KEY, String(retryAfter));
+    setRetryAfter(retryAfter);
+    setLockoutRemaining(retryAfter);
     setRemainingAttempts(0);
     setLockoutOpen(true);
   }
@@ -122,13 +121,13 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
     const result = await signIn(email, password);
 
     if (!result.success) {
-      if (result.rateLimited) {
-        handleRateLimit();
+      if (result.retryAfter && result.lockoutStrikes) {
+        handleServerLockout(result.retryAfter, result.lockoutStrikes);
       } else {
         setError(result.error);
         const next = remainingAttempts - 1;
         if (next <= 0) {
-          handleRateLimit();
+          setRemainingAttempts(0);
         } else {
           setRemainingAttempts(next);
         }

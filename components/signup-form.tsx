@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
@@ -350,13 +351,13 @@ export function SignUpForm({ className, ...props }: React.ComponentProps<"div">)
                   </Button>
                   <div className="text-center text-xs text-muted-foreground">
                     Already have an account?{" "}
-                    <a
+                    <Link
                       href="/"
                       className="underline underline-offset-3 hover:text-foreground"
                       tabIndex={isLoading || isLocked ? -1 : 0}
                     >
                       Login
-                    </a>
+                    </Link>
                   </div>
                 </Field>
               </FieldGroup>
